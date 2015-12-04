@@ -21,6 +21,7 @@ public class TelegramBot {
     }
 
     public void sendMessage(String token, String chatId, String message) {
+        message = message.replace(" ", "%20");
         try {
             String url = "https://" + this._hostname + "/bot" + token + "/sendMessage?chat_id=" + chatId + "&text=" + message;
             this._logger.debug("broadcast message: " + message);

@@ -1,5 +1,8 @@
 package com.github.soramusoka.twitter_likes_to_telegram_bot;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.Options;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import twitter4j.*;
@@ -12,77 +15,67 @@ public class Main {
 
     public static void main(String args[]) throws Exception {
 
-        ConfigurationManager configManager = ConfigurationManager.loadConfiguration(args);
-        if (configManager == null) {
+        AppConfig config = loadConfiguration(args);
+        if (config == null) {
             throw new Exception("App Configuration error: ConfigurationManager");
         }
 
-        String APP_NAME = configManager.getValue("appName", "defaultApp");
-        String CONSUMER_KEY = configManager.getValue("consumerKey");
-        String CONSUMER_SECRET = configManager.getValue("consumerSecret");
-        String ACCESS_TOKEN = configManager.getValue("accessToken");
-        String ACCESS_SECRET = configManager.getValue("accessSecret");
-        String TELEGRAM_TOKEN = configManager.getValue("teleToken");
-        String TELEGRAM_CHAT_ID = configManager.getValue("teleChat");
-        String[] TWITTER_USERS = configManager.getValues("user");
-
-        if (TELEGRAM_CHAT_ID == null) throw new Exception("App configuration error: TELEGRAM_CHAT_ID is required");
-        if (TELEGRAM_TOKEN == null) throw new Exception("App configuration error: TELEGRAM_TOKEN is required");
-        if (CONSUMER_KEY == null) throw new Exception("App configuration error: CONSUMER_KEY is required");
-        if (CONSUMER_SECRET == null) throw new Exception("App configuration error: CONSUMER_SECRET is required");
-        if (ACCESS_TOKEN == null) throw new Exception("App configuration error: ACCESS_TOKEN is required");
-        if (ACCESS_SECRET == null) throw new Exception("App configuration error: ACCESS_SECRET is required");
-        if (TWITTER_USERS == null || TWITTER_USERS.length == 0)
-            throw new Exception("App configuration error: TWITTER_USERNAMES is required");
-
-        Logger logger = getLogger(APP_NAME);
+        Logger logger = getLogger(config.appName);
         if (logger == null) {
             throw new Exception("Logger configuration error");
         }
-
-        String users = "";
-        for (String aTWITTER_USERNAME : TWITTER_USERS) users += " @" + aTWITTER_USERNAME;
-
-        logger.info("Configuration: " +
-                "APP_NAME: " + APP_NAME +
-                ", TELEGRAM_TOKEN: " + TELEGRAM_TOKEN +
-                ", TELEGRAM_CHAT_ID: " + TELEGRAM_CHAT_ID +
-                ", CONSUMER_KEY: " + CONSUMER_KEY +
-                ", CONSUMER_SECRET: " + CONSUMER_SECRET +
-                ", ACCESS_TOKEN: " + ACCESS_TOKEN +
-                ", ACCESS_SECRET: " + ACCESS_SECRET +
-                ", TWITTER_USERNAMES: " + users);
+        logger.info("Startup configuration: " + config.toString());
 
         HttpRequest request = new HttpRequest();
-        TelegramBot bot = new TelegramBot(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, request, logger);
+        TelegramBot bot = new TelegramBot(config.teleToken, config.teleChat, request, logger);
 
-        Twitter twitter = getTwitterInstance(ACCESS_TOKEN, ACCESS_SECRET, CONSUMER_KEY, CONSUMER_SECRET);
+        Twitter twitter = getTwitterInstance(config.accessToken, config.accessSecret, config.consumerKey, config.consumerSecret);
         logger.debug("Twitter instance successfully created");
 
         String processedFilePath = "processed.data";
-        IOManager ioManager = IOManager.createInstance(logger, processedFilePath);
+        IOManager ioManager = new IOManager(logger, processedFilePath);
 
         ArrayList<Long> processedStatuses = ioManager.getData();
         logger.debug("Processed statuses size: " + processedStatuses.size());
 
-        for (String user : TWITTER_USERS) {
+        for (String user : config.users) {
             logger.debug("Started processing for user: " + user);
 
-            ResponseList<Status> twits = twitter.getFavorites(user);
+            ResponseList<Status> twits = null;
+            Integer requestCounter = 0;
+
+            while (twits == null || requestCounter == config.requestCounterMax) {
+                try {
+                    requestCounter++;
+                    twits = twitter.getFavorites(user);
+                } catch (TwitterException e) {
+                    if (e.getStatusCode() == 429) {
+                        Integer secondsUntilReset = e.getRateLimitStatus().getSecondsUntilReset();
+                        logger.info("Rate limit reached. Wait " + secondsUntilReset + " seconds till next try");
+                        Thread.sleep(secondsUntilReset * 1000);
+                    }
+                }
+            }
+
             if (twits != null) {
                 for (Status status : twits) {
                     Long id = status.getId();
                     if (!processedStatuses.contains(id)) {
                         String screenName = status.getUser().getScreenName();
-                        String message = "https://twitter.com/" + screenName + "/status/" + id;
-                        // bot.sendMessage(message);
-                        logger.debug("Status " + id + " processed " + message);
+
+                        if (!ioManager.isFirstRun) {
+                            String message = "https://twitter.com/" + screenName + "/status/" + id;
+                            bot.sendMessage("From user " + user + ": " + message);
+                            logger.debug("Status " + id + " processed " + message);
+                        }
+
                         processedStatuses.add(id);
                     }
                 }
             } else {
                 logger.debug("User " + user + " don't have any favorites");
             }
+            logger.info("Processing for user " + user + " finished");
         }
         ioManager.saveData(processedStatuses);
     }
@@ -106,6 +99,45 @@ public class Main {
             return Logger.getLogger(appName);
         } catch (Exception e) {
             System.out.println("error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public static AppConfig loadConfiguration(String[] args) {
+        try {
+            Options options = new Options();
+
+            options.addOption("appName", "appName", false, "Application name");
+            options.addOption("accessToken", "accessToken", true, "Twitter access token");
+            options.addOption("accessSecret", "accessSecret", true, "Twitter access secret");
+            options.addOption("consumerKey", "consumerKey", true, "Twitter consumer key");
+            options.addOption("consumerSecret", "consumerSecret", true, "Twitter consumer secret");
+            options.addOption("user", "user", true, "Twitter user. Could be use add multiple values");
+            options.addOption("teleToken", "teleToken", true, "Telegram access token");
+            options.addOption("teleChat", "teleChat", true, "Telegram chat id. Positive number");
+            options.addOption("requestCounterMax", "requestCounterMax", true, "Twitter request try counter per user. Positive number");
+
+            CommandLineParser optionsParser = new ExtendedGnuParser(true);
+            CommandLine cmd = optionsParser.parse(options, args);
+
+            AppConfig appConfig = new AppConfig();
+            appConfig.appName = cmd.hasOption("appName") ? cmd.getOptionValue("appName") : appConfig.appName;
+            appConfig.accessSecret = cmd.getOptionValue("accessSecret");
+            appConfig.accessToken = cmd.getOptionValue("accessToken");
+            appConfig.consumerKey = cmd.getOptionValue("consumerKey");
+            appConfig.consumerSecret = cmd.getOptionValue("consumerSecret");
+            appConfig.users = cmd.getOptionValues("user");
+            appConfig.teleChat = cmd.getOptionValue("teleChat");
+            appConfig.teleToken = cmd.getOptionValue("teleToken");
+
+            String requestCounterMax = cmd.hasOption("requestCounterMax") ? cmd.getOptionValue("requestCounterMax") : null;
+            if (requestCounterMax != null) {
+                appConfig.requestCounterMax = Integer.decode(requestCounterMax);
+            }
+
+            return appConfig;
+        } catch (Exception e) {
+            System.out.println(e.toString());
             return null;
         }
     }

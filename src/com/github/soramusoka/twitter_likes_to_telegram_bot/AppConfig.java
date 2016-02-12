@@ -2,14 +2,14 @@ package com.github.soramusoka.twitter_likes_to_telegram_bot;
 
 public class AppConfig {
     public String appName;
-    public String accessToken;
-    public String accessSecret;
-    public String consumerKey;
-    public String consumerSecret;
+    public String twitterAccessToken;
+    public String twitterAccessSecret;
+    public String twitterConsumerKey;
+    public String twitterConsumerSecret;
+    public String telegramToken;
+    public String telegramChat;
+    public int requestCounterMax;
     public String[] users;
-    public String teleToken;
-    public String teleChat;
-    public Number requestCounterMax;
 
     public AppConfig() {
         this.appName = "Default app";
@@ -19,12 +19,12 @@ public class AppConfig {
 
     public String toString() {
         String result = "appName: " + this.appName +
-                ", accessToken: " + this.accessToken +
-                ", accessSecret: " + this.accessSecret +
-                ", consumerKey: " + this.consumerKey +
-                ", consumerSecret: " + this.consumerSecret +
-                ", teleChat: " + this.teleChat +
-                ", teleToken: " + this.teleToken +
+                ", twitterAccessToken: " + this.twitterAccessToken +
+                ", twitterAccessSecret: " + this.twitterAccessSecret +
+                ", twitterConsumerKey: " + this.twitterConsumerKey +
+                ", twitterConsumerSecret: " + this.twitterConsumerSecret +
+                ", telegramChat: " + this.telegramChat +
+                ", telegramToken: " + this.telegramToken +
                 ", requestCounterMax: " + this.requestCounterMax;
 
         result += ", users: ";

@@ -1,4 +1,4 @@
-# twitter-likes-to-telegram-bot
+# Twitter Likes forwarder to Telegram chat
 
 ### Requrements
 - java8
@@ -6,15 +6,20 @@
 
 ### Usage
 
+```shell
+usage: java -jar rss_to_telegram.jar [-a <arg>] [-e <arg>] [-h] [-k <arg>] [-o <arg>]
+       [-r <arg>] [-s <arg>] [-t <arg>] [-u <arg>]
+Options
+   -a,--telegramChat <arg>              Telegram chat id. Positive number.
+                                        Required
+   -e,--twitterConsumerSecret <arg>     Twitter consumer secret. Required
+   -h,--help                            Show usage
+   -k,--twitterConsumerKey <arg>        Twitter consumer key. Required
+   -o,--telegramToken <arg>             Telegram access token. Required
+   -r,--requestCounterMax <arg>         Twitter request try counter per user.
+                                        Positive number. Optional
+   -s,--twitterAccessSecret <arg>       Twitter access secret. Required
+   -t,--twitterAccessToken <arg>        Twitter access token. Required
+   -u,--user <arg>                      Twitter user. Could be used to add
+                                        multiple values. Required
 ```
-java -jar out/artifacts/twitter_likes_to_telegram_bot_jar/twitter-likes-to-telegram-bot.jar --consumerKey=[consumerKey] --consumerSecret=[consumerSecret] --accessToken=[accessToken] --accessSecret=[accessSecret] --teleToken=[teleToken] --teleChat=[teleChat] --user=[username]
-```
-
-#### params:
-	--consumerKey=[consumerKey] - Required, Twitter consumer key, string
-	--consumerSecret=[consumerSecret] - Required, Twitter consumer secret, string
-	--accessToken=[accessToken] - Required, Twitter access token, string
-	--accessSecret=[accessSecret] - Required, Twitter access secret, string
-	--teleToken=[teleToken] - Required, Telegram acess token, string
-	--teleChat=[teleChat] - Required, Telegram chat id, positive number
-	--user=[username] - Required, Twitter username, string. Could be use multiples times to ass many users
